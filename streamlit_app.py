@@ -140,6 +140,10 @@ if uploaded_file is not None:
     excel_file.seek(0)
 
     # --- Display Tables on Streamlit UI ---
+    st.subheader("NSG Metadata")
+    metadata_df = pd.DataFrame(list(metadata.items()), columns=["Field", "Value"])
+    st.table(metadata_df)
+
     st.subheader("NSG Rules Table")
     st.dataframe(df_rules)
 
