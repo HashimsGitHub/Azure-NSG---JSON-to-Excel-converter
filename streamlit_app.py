@@ -2,7 +2,7 @@ import streamlit as st
 
 st.title("🎈 AZURE NSG Rules - JSON to nice Excel coverter")
 st.write(
-    "Convert Azure NSG JSON export to Excel"
+    ""
 )
 
 import io
