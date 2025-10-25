@@ -1,16 +1,29 @@
 import streamlit as st
-
-st.title("🎈 AZURE NSG Rules - JSON to nice Excel coverter")
-st.write("")
-
 import io
 import json
 import re
 import pandas as pd
-import streamlit as st
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+
+# --- Page Config ---
+st.set_page_config(
+    page_title="Azure NSG Rules Converter",
+    page_icon="🎈",
+    layout="wide"
+)
+
+# --- Header Section with Azure Branding ---
+st.markdown("""
+    <div style="display:flex; align-items:center; gap:15px; background-color:#0078D4; padding:15px; border-radius:10px; color:white;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/f/fa/Microsoft_Azure.svg" width="60">
+        <h1 style="margin:0;">Azure NSG Rules - JSON to Excel Converter</h1>
+    </div>
+    <p style="margin-top:10px; font-size:16px; color:#333;">
+        Upload an Azure Network Security Group (NSG) JSON export and convert it into a clean, formatted Excel report 📊
+    </p>
+""", unsafe_allow_html=True)
 
 # --- Region formatter ---
 def format_location(loc: str) -> str:
@@ -19,6 +32,7 @@ def format_location(loc: str) -> str:
         return ""
     loc_lower = loc.lower()
     region_map = {
+        # --- Australia / APAC ---
         "australiaeast": "Australia East",
         "australiasoutheast": "Australia Southeast",
         "australiacentral": "Australia Central",
@@ -32,18 +46,80 @@ def format_location(loc: str) -> str:
         "southindia": "South India",
         "centralindia": "Central India",
         "westindia": "West India",
-        # ... (other regions)
+
+        # --- China (21Vianet) ---
+        "chinanorth": "China North",
+        "chinanorth2": "China North 2",
+        "chinaeast": "China East",
+        "chinaeast2": "China East 2",
+
+        # --- Europe ---
+        "northeurope": "North Europe",
+        "westeurope": "West Europe",
+        "francecentral": "France Central",
+        "francesouth": "France South",
+        "germanynorth": "Germany North",
+        "germanywestcentral": "Germany West Central",
+        "norwayeast": "Norway East",
+        "norwaywest": "Norway West",
+        "swedencentral": "Sweden Central",
+        "swedensouth": "Sweden South",
+        "switzerlandnorth": "Switzerland North",
+        "switzerlandwest": "Switzerland West",
+        "polandcentral": "Poland Central",
+        "italynorth": "Italy North",
+        "spaincentral": "Spain Central",
+        "ukwest": "UK West",
+        "uksouth": "UK South",
+
+        # --- Americas ---
+        "eastus": "East US",
+        "eastus2": "East US 2",
+        "westus": "West US",
+        "westus2": "West US 2",
+        "westus3": "West US 3",
+        "centralus": "Central US",
+        "northcentralus": "North Central US",
+        "southcentralus": "South Central US",
+        "westcentralus": "West Central US",
+        "canadacentral": "Canada Central",
+        "canadaeast": "Canada East",
+        "brazilsouth": "Brazil South",
+        "brazilsoutheast": "Brazil Southeast",
+        "mexicocentral": "Mexico Central",
+        "chilecentral": "Chile Central",
+
+        # --- Middle East / Africa ---
+        "uaecentral": "UAE Central",
+        "uaenorth": "UAE North",
+        "qatarcentral": "Qatar Central",
+        "southafricanorth": "South Africa North",
+        "southafricawest": "South Africa West",
+        "israelcentral": "Israel Central",
+
+        # --- US Government / DoD ---
+        "usgovvirginia": "US Gov Virginia",
+        "usgovarizona": "US Gov Arizona",
+        "usgoviowa": "US Gov Iowa",
+        "usgovtexas": "US Gov Texas",
+        "usdodeast": "US DoD East",
+        "usdodcentral": "US DoD Central",
+
+        # --- Special / Edge ---
+        "global": "Global",
+        "centraluseuap": "Central US EUAP",
+        "eastus2euap": "East US 2 EUAP"
     }
 
     if loc_lower in region_map:
         return region_map[loc_lower]
+    # fallback for unknown regions
     loc_cleaned = re.sub(r'([a-z])([A-Z0-9])', r'\1 \2', loc_lower.title())
     loc_cleaned = loc_cleaned.replace("Azure ", "").replace("-", " ").title()
     return loc_cleaned
 
-# --- Streamlit File Upload ---
-st.title("Convert Azure NSG JSON to Excel")
-uploaded_file = st.file_uploader("Choose a JSON file", type="json")
+# --- File Upload Section ---
+uploaded_file = st.file_uploader("📂 Upload your Azure NSG JSON file", type="json")
 
 if uploaded_file is not None:
     # --- Parse JSON ---
@@ -51,16 +127,19 @@ if uploaded_file is not None:
     nsg_name = data.get("name", "Unknown NSG")
     id_path = data.get("id", "")
     subscription_id = id_path.split("/")[2] if id_path else ""
-    resource_group = id_path.split("/resourceGroups/")[1].split("/")[0] if "/resourceGroups/" in id_path else ""
+    resource_group = (
+        id_path.split("/resourceGroups/")[1].split("/")[0]
+        if "/resourceGroups/" in id_path else ""
+    )
     metadata = {
-        "Resource group": resource_group,
+        "Resource Group": resource_group,
         "Location": format_location(data.get("location", "")),
         "Subscription ID": subscription_id,
     }
 
-    # --- RULES ---
+    # --- NSG Rules ---
     rules = data["properties"].get("securityRules", []) + data["properties"].get("defaultSecurityRules", [])
-    
+
     def replace_any(v):
         if isinstance(v, str):
             return "Any" if v.strip() == "*" else v
@@ -77,7 +156,7 @@ if uploaded_file is not None:
         records.append({
             "Priority": int(p.get("priority", 0)),
             "Direction": p.get("direction", ""),
-            "RuleName": r.get("name", ""),
+            "Rule Name": r.get("name", ""),
             "Port": replace_any(ports),
             "Protocol": replace_any(p.get("protocol", "")),
             "Source": replace_any(sources),
@@ -95,14 +174,17 @@ if uploaded_file is not None:
     wb = Workbook()
     ws = wb.active
     ws.title = "NSG_RULES"
+
+    # Styles
     bold = Font(bold=True)
     title_font = Font(bold=True, size=14)
-    hdr_fill = PatternFill("solid", "D9E1F2")
-    title_fill = PatternFill("solid", "BDD7EE")
+    hdr_fill = PatternFill("solid", fgColor="D9E1F2")
+    title_fill = PatternFill("solid", fgColor="BDD7EE")
     align_center = Alignment(horizontal="center")
-    border = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
+    border = Border(left=Side(style="thin"), right=Side(style="thin"),
+                    top=Side(style="thin"), bottom=Side(style="thin"))
 
-    # Add NSG name and metadata to Excel
+    # Header Info
     ws.append([nsg_name])
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
     ws["A1"].font = title_font
@@ -113,18 +195,18 @@ if uploaded_file is not None:
         ws.append([k, v])
         ws[f"A{ws.max_row}"].font = bold
     ws.append([""])
-    
-    # Add Rules Table to Excel
-    ws.append(["ROUTES"])
+
+    # Rules Table
+    ws.append(["NSG RULES"])
     ws.append(df_rules.columns.tolist())
-    for i in range(1, 9):
+    for i in range(1, len(df_rules.columns) + 1):
         cell = ws[f"{get_column_letter(i)}{ws.max_row}"]
         cell.font = bold
         cell.fill = hdr_fill
     for r in df_rules.itertuples(index=False):
         ws.append(list(r))
 
-    # Add border and column width adjustments
+    # Borders & Widths
     for row in ws.iter_rows():
         for c in row:
             if c.value:
@@ -132,23 +214,35 @@ if uploaded_file is not None:
     for col in ws.columns:
         ws.column_dimensions[get_column_letter(col[0].column)].width = max(len(str(c.value)) for c in col if c.value) + 3
 
-    # Save Excel file to BytesIO object
+    # Save to memory
     excel_file = io.BytesIO()
     wb.save(excel_file)
     excel_file.seek(0)
 
-    # --- Display Tables on Streamlit UI ---
-    st.subheader("NSG Metadata")
-    metadata_df = pd.DataFrame(list(metadata.items()), columns=["Field", "Value"])
-    st.table(metadata_df)
+    # --- Display on Streamlit ---
+    st.markdown("### 📘 NSG Metadata")
+    st.table(pd.DataFrame(list(metadata.items()), columns=["Field", "Value"]))
 
-    st.subheader("NSG Rules Table")
-    st.dataframe(df_rules)
+    st.markdown("### 🔒 NSG Rules Overview")
+    st.dataframe(df_rules, use_container_width=True)
 
-    # --- Streamlit Save As File ---
+    # --- Download Button ---
     st.download_button(
-        label="Download Excel",
+        label="💾 Download Excel Report",
         data=excel_file,
         file_name=f"{nsg_name}_NSG_Rules.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        help="Click to download the formatted Excel report."
     )
+
+else:
+    st.info("👆 Please upload a JSON file to begin.")
+
+# --- Footer ---
+st.markdown("""
+    <hr style="margin-top:40px;">
+    <div style="text-align:center; color:gray; font-size:14px;">
+        Built with ❤️ using Streamlit & Microsoft Azure<br>
+        © 2025 Hashim Hilal — Cloud Architect 
+    </div>
+""", unsafe_allow_html=True)
