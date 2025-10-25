@@ -1,9 +1,7 @@
 import streamlit as st
 
 st.title("🎈 AZURE NSG Rules - JSON to nice Excel coverter")
-st.write(
-    ""
-)
+st.write("")
 
 import io
 import json
